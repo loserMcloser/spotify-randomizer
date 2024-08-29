@@ -191,7 +191,14 @@ if __name__ == "__main__":
 		main()
 		exit_code = os.EX_OK
 	except SpotipyConfigError as e:
-		logging.error(f'{e.args[0]}, will not be able to log in to Spotify')
+		config_path = Path(user_config_dir(app_name)) / 'config.yaml'
+		logging.error(
+		  f'{e.args[0]}, will not be able to log in to Spotify\n\n'
+		  'You need a properly-formatted config file saved at location\n\n'
+		  f'    {config_path}\n\n'
+		  'See\n\n    https://github.com/loserMcloser/spotify-randomizer/blob/main/config.yaml\n\n'
+		  'for a sample config'
+		)
 		exit_code = os.EX_CONFIG
 	except NoPlaylists:
 		logging.error('Your account does not have any playlists to randomize')
