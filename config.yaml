@@ -1,0 +1,70 @@
+## On Linux this file should be placed at location
+##   $XDG_CONFIG_HOME/spotify-randomizer/config.yaml
+
+## You need to:
+## 1. Create a Spotify application so you can use the spotipy backend.
+##    You can do this at the Spotify developer website.
+##    (https://developer.spotify.com/dashboard)
+## 2. Enter the newly-created spotify application's client ID and secret
+##    into this config file.
+## 3. In the "Redirect URIs" field of your spotify application's settings
+##    (still on the Spotify developer website),
+##    add
+##    http://localhost:PORT
+##    with PORT replaced by the value of 'redirect_uri_port' below.
+
+spotipy:
+  client_id: your_client_id_from_spotify
+  client_secret: your_client_secret_from_spotify
+  #
+  # The port value below is the default, you can change it if you wish
+  # but your "Redirect URIs" field of your spotify application's settings
+  # on the Spotify developer website needs to match.
+  redirect_uri_port: 14523
+  #
+  # You can specify the directory in which you would like spotipy to cache
+  # your Spotify OAuth token with the setting below. Caching the token means
+  # that you don't have to log in to Spotify through a browser every time.
+  # (The token will expire after some time).
+  # But you can just leave this setting commented out: the default will be
+  # the standard user's cache directory. (On Linux this is $XDG_CACHE_HOME).
+  # Alternatively, you can set this to the string "memory" and the token will
+  # not be saved to disk, and will only be held in memory for the duration of
+  # the run.
+  #token_cache_dir: /home/your_username/.cache
+
+randomizer:
+  # When creating a randomized copy of a playlist,
+  # the new playlist will be named the same as the old
+  # but with the suffix below appended.
+  copy_suffix: " (Randomized)"
+  playlists:
+    # List of playlists that you would like to randomize each time the app is run.
+    # Omit this list altogether if you would like the app to prompt you to choose a
+    # single playlist from the list of all your playlists.
+    #
+    # Playlist entries consist of the playlist 'id' and a per-playlist 'in_place'
+    # setting
+    #
+    # IDs
+    # ----
+    # To get a playlist ID from the Spotify app,
+    # choose "Share->Copy link to playlist"
+    # The URL will be in the form
+    # https://open.spotify.com/playlist/ALPHANUMERICSTRING?si=ALPHANUMERICSTRING
+    # ---> Copy that first ALPHANUMERICSTRING into the 'id' field below.
+    # It might be a good idea to add a comment here with the *name* of your playlist
+    # so you can remember which playlist is which in the list below.
+    #
+    # "In Place" Setting
+    # ------------------
+    # This means whether you want to randomize this playlist "in place," permanently
+    # altering  the order of your playlist. The default is 'false' which means that
+    # instead, a randomized *copy* will be created (see 'copy_suffix' above) and the
+    # order of the original playlist will remain unchanged.
+    #
+    - id: ALPHANUMERICSTRING
+      in_place: false
+    - id: ANOTHERALPHANUMERICSTRING
+      in_place: true
+    # add more playlist entries as you wish
