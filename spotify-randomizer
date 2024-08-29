@@ -1,0 +1,204 @@
+#!/usr/bin/python
+
+
+#### modules #####################################################################################
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
+
+import os
+import sys
+import yaml
+import logging
+from random       import randrange
+from shutil       import get_terminal_size
+from pathlib      import Path
+from contextlib   import suppress
+from platformdirs import user_config_dir, user_cache_dir
+##################################################################################################
+
+
+app_name = 'spotify-randomizer'
+
+
+#### exceptions ##################################################################################
+class SpotipyConfigError (Exception) : pass
+class NoPlaylists        (Exception) : pass
+class NoPlaylistsChosen  (Exception) : pass
+class TokenCacheDirError (Exception) : pass
+##################################################################################################
+
+
+#### configuration ###############################################################################
+def read_config_value(config, section, key, default):
+	with suppress(KeyError): default = config[section][key]
+	return default
+
+def get_config():
+	config_path = Path(user_config_dir(app_name)) / 'config.yaml'
+	if not config_path.exists():
+		raise SpotipyConfigError('No config file found')
+	with open(config_path) as c:
+		config = yaml.safe_load(c)
+	try:
+		client_id = config['spotipy']['client_id']
+		client_secret = config['spotipy']['client_secret']
+	except KeyError:
+		raise SpotipyConfigError('Missing client_id and/or client_secret setting in spotipy section of config file')
+	token_cache_dir = read_config_value(config, 'spotipy', 'token_cache_dir', user_cache_dir())
+	port = read_config_value(config, 'spotipy', 'redirect_uri_port', '14523')
+	copy_suffix = read_config_value(config, 'randomizer', 'copy_suffix', ' (Randomized)')
+	playlists_to_randomize = read_config_value(config, 'randomizer', 'playlists', [])
+	return {
+	  'client_id'             : client_id,
+	  'client_secret'         : client_secret,
+	  'token_cache_dir'       : token_cache_dir,
+	  'redirect_uri_port'     : port,
+	  'copy_suffix'           : copy_suffix,
+	  'playlists_to_randomize': playlists_to_randomize
+	}
+##################################################################################################
+
+
+#### user input ##################################################################################
+def give_choices(prompt, choices):
+	# WARNING: returns index between 1 and len(choices) inclusive
+	print(prompt)
+	for index, c in enumerate(choices):
+		print(f'{index+1}) {c}')
+	user_choice = input('Your choice: ')
+	return int(user_choice) if user_choice in map(str, range(1, len(choices) + 1)) else None
+
+def ask_user(playlists):
+	names = list(map(lambda p: p['name'], playlists['items']))
+	user_choice = give_choices('Pick a playlist to randomize:', names)
+	if not user_choice:
+		raise NoPlaylistsChosen
+	playlist_id = playlists['items'][int(user_choice) - 1]['id']
+	user_choice = give_choices(
+	  'Do you want to:',
+	  ['make a randomized copy of the playlist ?', 'permanently alter the order of the playlist ?']
+	)
+	in_place = (user_choice == 2)
+	return { 'id': playlist_id, 'in_place': in_place }
+##################################################################################################
+
+
+#### randomize a specific playlist ###############################################################
+def nprint(s):
+	print(s,end='')
+
+def rprint(s):
+	print(s,end='\r')
+
+def progress(index,total):
+	w,h = get_terminal_size((107,0))
+	track_len = len(str(total))
+	total_pad = 22 + 2 * track_len
+	w = min(w, 100 + total_pad)
+	adjusted_w = w - total_pad
+	if adjusted_w < 10:
+		return False
+	nprint(f'  {index:>{track_len}}/{total} tracks  [')
+	percent = index / total
+	display_percent = round(percent * 100)
+	nstars = round(adjusted_w * percent)
+	nprint('*' * nstars)
+	nprint(' ' * (adjusted_w - nstars))
+	rprint(f']  {display_percent:>3}%')
+	return True
+
+def randomize(spotify_obj, user_id, copy_suffix, playlist, playlists):
+	playlist_id = playlist['id']
+	p = spotify_obj.playlist(playlist_id)
+	pname = p['name']
+	if p['owner']['id'] != user_id:
+		logging.warning(f'You don\'t own playlist "{pname}", refusing to randomize')
+		return
+	if playlist['in_place']:
+		logging.info(f'Randomizing playlist "{pname}" in place, order of playlist will be permanently altered')
+	else:
+		new_pname = pname + copy_suffix
+		new_pname_exists = False
+		for q in playlists['items']:
+			if q['name'] == new_pname:
+				logging.warning(f'Playlist "{new_pname}" already exists, will randomize it in place')
+				playlist_id = q['id']
+				new_pname_exists = True
+				break
+		if not new_pname_exists:
+			logging.info(f'Creating playlist "{new_pname}" as randomized copy of "{pname}"')
+			result = spotify_obj.user_playlist_create(user_id, new_pname, description=(f'Randomized copy of "{pname}"'))
+			playlist_id = result['id']
+			track_ids = list(map(lambda t: t['track']['id'], p['tracks']['items']))
+			spotify_obj.user_playlist_add_tracks(user_id, playlist_id, track_ids)
+	ntracks = int(spotify_obj.playlist(playlist_id)['tracks']['total'])
+	for i in range(0,ntracks):
+		progress(i,ntracks)
+		random_index = randrange(i,ntracks)
+		spotify_obj.playlist_reorder_items(playlist_id, random_index, 0)
+	final_progress = progress(ntracks,ntracks)
+	print()
+	if not final_progress: logging.info('Finished')
+##################################################################################################
+
+
+#### main ########################################################################################
+def main():
+
+	logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+	settings = get_config()
+	token_cache_dir = settings['token_cache_dir']
+	if token_cache_dir == 'memory':
+		cache_handler = spotipy.cache_handler.MemoryCacheHandler()
+	else:
+		token_cache_dir_path = Path(token_cache_dir)
+		if not token_cache_dir_path.exists() or not token_cache_dir_path.is_dir():
+			raise TokenCacheDirError
+		token_cache_file = token_cache_dir_path / (app_name + '.token')
+		try:
+			cache_handler = spotipy.cache_handler.CacheFileHandler(cache_path=token_cache_file)
+		except Exception:
+			raise TokenCacheDirError
+	scope = "playlist-read-private,playlist-read-collaborative,playlist-modify-private,playlist-modify-public"
+	spotify_obj = spotipy.Spotify(
+	  auth_manager=SpotifyOAuth(
+	    client_id     = settings['client_id'],
+	    client_secret = settings['client_secret'],
+	    redirect_uri  = "http://localhost:" + settings['redirect_uri_port'],
+        scope         = scope,
+		cache_handler = cache_handler
+	  )
+	)
+	user_id = spotify_obj.me()['id']
+
+	playlists = spotify_obj.current_user_playlists()
+	if playlists['total'] == '0':
+		raise NoPlaylists
+	playlists_to_randomize = settings['playlists_to_randomize']
+	if not playlists_to_randomize:
+		user_choice = ask_user(playlists)
+		playlists_to_randomize.append(user_choice)
+
+	copy_suffix = settings['copy_suffix']
+	for playlist in playlists_to_randomize:
+		randomize(spotify_obj, user_id, copy_suffix, playlist, playlists)
+##################################################################################################
+
+
+if __name__ == "__main__":
+	exit_code = os.EX_SOFTWARE  # assume some error has occurred until main() exits cleanly
+	try:
+		main()
+		exit_code = os.EX_OK
+	except SpotipyConfigError as e:
+		logging.error(f'{e.args[0]}, will not be able to log in to Spotify')
+		exit_code = os.EX_CONFIG
+	except NoPlaylists:
+		logging.error('Your account does not have any playlists to randomize')
+	except NoPlaylistsChosen:
+		logging.error('You have not specified any playlists to randomize. Bye.')
+		exit_code = os.EX_OK
+	except TokenCacheDirError:
+		logging.error('The specified token_cache_dir is inaccessible or is not a directory.')
+		exit_code = os.EX_CANTCREAT
+	exit(exit_code)
