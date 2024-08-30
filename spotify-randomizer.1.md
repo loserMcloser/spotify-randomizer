@@ -8,7 +8,7 @@ NAME
 SYNOPSIS
 ========
 
-| **spotify-randomizer**
+| **spotify-randomizer** \[**-c**|**--config** _file_]
 
 DESCRIPTION
 ===========
@@ -17,6 +17,17 @@ Randomizes one or more Spotify playlists.
 A playlist to randomize can be chosen interactively,
 or multiple playlists can be specified by their Spotify IDs in the config file.
 (See FILES.)
+
+Options
+-------
+
+-h, --help
+
+:   Prints brief usage information.
+
+-c, --config
+
+:   Specifies an alternative location for the required config file.
 
 FILES
 =====

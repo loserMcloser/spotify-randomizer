@@ -5,12 +5,20 @@
 \f[B]spotify-randomizer\f[R] \[em] randomizes Spotify playlists
 .SH SYNOPSIS
 .PP
-\f[B]spotify-randomizer\f[R]
+\f[B]spotify-randomizer\f[R] [\f[B]-c\f[R]|\f[B]\[en]config\f[R]
+\f[I]file\f[R]]
 .SH DESCRIPTION
 Randomizes one or more Spotify playlists.
 A playlist to randomize can be chosen interactively, or multiple
 playlists can be specified by their Spotify IDs in the config file.
 (See FILES.)
+.SS Options
+.TP
+-h, \[en]help
+Prints brief usage information.
+.TP
+-c, \[en]config
+Specifies an alternative location for the required config file.
 .SH FILES
 .TP
 \f[I]$XDG_CONFIG_HOME/spotify-randomizer/config.yaml\f[R]

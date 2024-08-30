@@ -23,5 +23,7 @@ and the script will prompt you to choose a playlist to randomize.
 (On Linux: `mkdir ${XDG_CONFIG_HOME}/spotify-randomizer`.)
 Then save `config.yaml` under this directory.
 (If you are not sure where to create this directory, run the script without any `config.yaml` and it will tell you where you need to put it.)
+Alternatively, you may specify the location of `config.yaml` on the command line.
+(See the output of `spotify-randomizer --help`.)
 
 Once this is done you are ready to run the `spotify-randomizer` script.
