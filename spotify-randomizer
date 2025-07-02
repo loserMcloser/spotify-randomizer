@@ -6,7 +6,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
 import os
-import sys
+#import sys
 import yaml
 import logging
 import argparse
@@ -194,7 +194,7 @@ def main():
 	  auth_manager=SpotifyOAuth(
 	    client_id     = settings['client_id'],
 	    client_secret = settings['client_secret'],
-	    redirect_uri  = "http://localhost:" + settings['redirect_uri_port'],
+	    redirect_uri  = f'http://localhost:{settings['redirect_uri_port']}',
         scope         = scope,
 		cache_handler = cache_handler
 	  )
